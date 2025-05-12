@@ -35,6 +35,7 @@ impl std::fmt::Display for Term<'_> {
 
             Scale { coefficient, term } => match term {
                 Sum(s1, s2) => write!(f, "{coefficient}({s1} + {s2})"),
+                Scale { coefficient: coefficient2, term: term2 } => write!(f, "{}{term2}", coefficient * coefficient2), // remove this line and instead write a simplification function
                 _ => write!(f, "{coefficient}{term}")
             },
 
@@ -79,6 +80,7 @@ mod tests {
         use Term::*;
 
         let terms = vec![
+            Scale { coefficient: 2.0, term: &Scale { coefficient: 3.0, term: &Scale { coefficient: 2.0, term: &Sin(&Var('x')) }} },
             Derivative { order: 0, term: &Sin(&Product(&Constant(2.0), &Var('x'))) },
             Derivative { order: 1, term: &Sin(&Product(&Constant(2.0), &Var('x'))) },
             Derivative { order: 2, term: &Sin(&Product(&Constant(2.0), &Var('x'))) },
