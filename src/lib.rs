@@ -38,6 +38,7 @@ mod tests {
     #[test]
     fn it_works() {
         let terms = [
+            Scale { coefficient: 2.0, term: Box::new(Scale { coefficient: 3.0, term: Box::new(Scale { coefficient: 2.0, term: Box::new(Var('x')) })}) },
             Scale { coefficient: 2.0, term: Box::new(Scale { coefficient: 3.0, term: Box::new(Scale { coefficient: 2.0, term: Box::new(Sin(Box::new(Var('x')))) })}) },
             //Derivative { order: 3, wrt: Box::new(Var('x')), term: Box::new(Sin(Box::new(Product(Box::new(Constant(2.0)), Box::new(Var('x')))))) },
             /*Sum(&Var('x'), &Constant(5.0)),
