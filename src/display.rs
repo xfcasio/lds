@@ -12,7 +12,7 @@ impl std::fmt::Display for Term {
 
             Scale { coefficient, term } => match *term.clone() {
                 Sum(s1, s2) => write!(f, "{coefficient}({s1} + {s2})"),
-                //Scale { coefficient: coefficient2, term: term2 } => write!(f, "{}{term2}", coefficient * coefficient2), // remove this line and instead write a simplification function
+                Scale { coefficient: coefficient2, term: term2 } => write!(f, "{coefficient}*{coefficient2}*{}", term2),
                 _ => write!(f, "{coefficient}{term}")
             },
 
