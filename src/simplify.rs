@@ -23,43 +23,24 @@ impl Term {
                 Scale {
                     coefficient: coefficient2,
                     term: term2,
-                } => Scale {
-                    coefficient: coefficient * coefficient2,
-                    term: term2,
-                }
-                .simplify(),
+                } => Scale { coefficient: coefficient * coefficient2, term: term2 }.simplify(),
 
                 /* distributivity */
                 Sum(t1, t2) => Sum(
                     Box::new(
-                        Scale {
-                            coefficient,
-                            term: Box::new(t1.simplify()),
-                        }
-                        .simplify(),
+                        Scale { coefficient, term: Box::new(t1.simplify()) }.simplify(),
                     ),
                     Box::new(
-                        Scale {
-                            coefficient,
-                            term: Box::new(t2.simplify()),
-                        }
-                        .simplify(),
+                        Scale { coefficient, term: Box::new(t2.simplify()) }.simplify(),
                     ),
-                )
-                .simplify(),
+                ).simplify(),
 
                 term if matches!(
                     term,
                     Var(_) | Sin(_) | Cos(_) | Power { .. } | Exponential(_, _) | Derivative { .. }
-                ) =>
-                {
-                    term
-                }
+                ) => Scale { coefficient, term: Box::new(term) },
 
-                _ => Scale {
-                    coefficient,
-                    term: Box::new(term.simplify()),
-                },
+                _ => Scale { coefficient, term: Box::new(term.simplify()) },
             },
 
             Product(t1, t2) => match (*t1, *t2) {
@@ -150,55 +131,32 @@ impl Term {
                     Scale {
                         coefficient: coefficient2,
                         term: term2,
-                    } => recursive_simplify(
-                        Scale {
-                            coefficient: coefficient * coefficient2,
-                            term: term2,
-                        },
-                        depth + 1,
-                    ),
+                    } => recursive_simplify(Scale { coefficient: coefficient * coefficient2, term: term2 }, depth + 1),
 
                     /* distributivity */
                     Sum(t1, t2) => {
                         let t1_simplified = recursive_simplify(*t1, depth + 1);
                         let t2_simplified = recursive_simplify(*t2, depth + 1);
 
-                        let s1_simplified = Box::new(recursive_simplify(
-                            Scale {
-                                coefficient,
-                                term: Box::new(t1_simplified),
-                            },
-                            depth + 1,
-                        ));
+                        let s1_simplified = Box::new(recursive_simplify(Scale {
+                            coefficient,
+                            term: Box::new(t1_simplified),
+                        }, depth + 1));
 
-                        let s2_simplified = Box::new(recursive_simplify(
-                            Scale {
-                                coefficient,
-                                term: Box::new(t2_simplified),
-                            },
-                            depth + 1,
-                        ));
+                        let s2_simplified = Box::new(recursive_simplify(Scale {
+                            coefficient,
+                            term: Box::new(t2_simplified),
+                        }, depth + 1));
 
                         recursive_simplify(Sum(s1_simplified, s2_simplified), depth + 1)
                     }
 
                     term if matches!(
                         term,
-                        Var(_)
-                            | Sin(_)
-                            | Cos(_)
-                            | Power { .. }
-                            | Exponential(_, _)
-                            | Derivative { .. }
-                    ) =>
-                    {
-                        term
-                    }
+                        Var(_) | Sin(_) | Cos(_) | Power { .. } | Exponential(_, _) | Derivative { .. }
+                    ) => Scale { coefficient, term: Box::new(term) },
 
-                    _ => Scale {
-                        coefficient,
-                        term: Box::new(recursive_simplify(*term, depth + 1)),
-                    },
+                    _ => Scale { coefficient, term: Box::new(recursive_simplify(*term, depth + 1)) },
                 },
 
                 Product(t1, t2) => match (*t1, *t2) {
