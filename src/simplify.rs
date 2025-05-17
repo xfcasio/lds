@@ -104,8 +104,7 @@ impl Term {
             },
 
             Derivative { order, wrt, term } => {
-                let term = term.simplify();
-                match term {
+                match term.simplify() {
                     Constant(c) => match order {
                         0 => Constant(c),
                         _ => Constant(0.0),
@@ -117,7 +116,7 @@ impl Term {
                         (_, _) => Constant(0.0),
                     },
 
-                    _ => Derivative {
+                    term => Derivative {
                         order,
                         wrt,
                         term: Box::new(term),
@@ -243,9 +242,7 @@ impl Term {
                 },
 
                 Derivative { order, wrt, term } => {
-                    let term = recursive_simplify(*term, depth + 1);
-
-                    match term {
+                    match recursive_simplify(*term, depth + 1) {
                         Constant(c) => match order {
                             0 => Constant(c),
                             _ => Constant(0.0),
@@ -257,7 +254,7 @@ impl Term {
                             (_, _) => Constant(0.0),
                         },
 
-                        _ => Derivative {
+                        term => Derivative {
                             order,
                             wrt,
                             term: Box::new(term),
