@@ -3,5 +3,14 @@
 version = 4
 
 [[package]]
+name = "bumpalo"
+version = "3.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "793db76d6187cd04dff33004d8e6c9cc4e05cd330500379d2394209271b4aeee"
+
+[[package]]
 name = "lades"
 version = "0.1.0"
+dependencies = [
+ "bumpalo",
+]

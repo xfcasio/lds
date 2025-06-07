@@ -1,31 +1,33 @@
-#![allow(unused)]
+#![feature(allocator_api)]
 
 mod display;
 mod simplify;
+mod differentiate;
 mod tests;
 
-use std::fmt;
-use std::ops::Deref;
+use bumpalo::Bump;
 
 /*struct Equation<'a> {
     pub lhs: Vec<Term<'a>>,
     pub rhs: Vec<Term<'a>>
 }*/
 
+type ArenaTerm<'arena> = Box<Term<'arena>, &'arena Bump>;
+
 #[derive(Clone, PartialEq)]
-enum Term {
+enum Term<'arena> {
     Constant(f64), // for now, arbitrary symbolic constants later.
     Var(char),
-    Sum(Box<Term>, Box<Term>),
+    Sum(ArenaTerm<'arena>, ArenaTerm<'arena>),
     
-    Scale { coefficient: f64, term: Box<Term>},
-    Product(Box<Term>, Box<Term>),
+    Scale { coefficient: f64, term: ArenaTerm<'arena>},
+    Product(ArenaTerm<'arena>, ArenaTerm<'arena>),
     
-    Power { base: Box<Term>, exponent: Box<Term>},
-    Exponential(f64, Box<Term>),
+    Power { base: ArenaTerm<'arena>, exponent: ArenaTerm<'arena>},
+    Exponential(f64, ArenaTerm<'arena>),
     
-    Sin(Box<Term>),
-    Cos(Box<Term>),
+    Sin(ArenaTerm<'arena>),
+    Cos(ArenaTerm<'arena>),
 
-    Derivative { order: usize, wrt: Box<Term>, term: Box<Term>},
+    Derivative { order: usize, wrt: ArenaTerm<'arena>, term: ArenaTerm<'arena>},
 }

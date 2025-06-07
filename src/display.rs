@@ -1,7 +1,7 @@
 use std::fmt;
 use crate::Term;
 
-impl std::fmt::Display for Term {
+impl std::fmt::Display for Term<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use Term::*;
 
@@ -13,7 +13,7 @@ impl std::fmt::Display for Term {
             Scale { coefficient, term } => match *term.clone() {
                 Sum(s1, s2) => write!(f, "{coefficient}({s1} + {s2})"),
                 Scale { coefficient: coefficient2, term: term2 } => write!(f, "{coefficient}*{coefficient2}*{}", term2),
-                _ => write!(f, "{coefficient}{term}")
+                _ => write!(f, "{coefficient}*{term}")
             },
 
             Product(t1, t2) => match (*t1.clone(), *t2.clone()) {
@@ -42,8 +42,6 @@ impl std::fmt::Display for Term {
             Cos(t) => write!(f, "cos({t})"),
 
             Derivative { order, wrt, term } => write!(f, "({term}, wrt: {}){}", wrt, "\'".repeat(*order)),
-
-            _ => { Ok(()) }
         }
     }
 }

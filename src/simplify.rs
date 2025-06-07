@@ -1,114 +1,125 @@
-use crate::Term;
+use crate::{Term, ArenaTerm};
+use bumpalo::Bump;
 
-impl Term {
-    pub fn simplify(self) -> Self {
+// consider adding SimplifyState enum with Deref<Target = Term> for cross-recursion communication
+
+impl<'arena> Term<'arena> {
+    pub fn simplify_in(self, arena: &'arena Bump) -> ArenaTerm<'arena> {
         use Term::*;
 
         match self {
-            Constant(_) | Var(_) => self,
+            Constant(_) | Var(_) => ArenaTerm::new_in(self, &arena),
 
             Sum(t1, t2) => match (*t1, *t2) {
-                (Constant(c1), Constant(c2)) => Constant(c1 + c2),
+                (Constant(c1), Constant(c2)) => ArenaTerm::new_in(Constant(c1 + c2), &arena),
+
+                (t, Constant(0.0)) => ArenaTerm::new_in(t, &arena),
+                (Constant(0.0), t) => ArenaTerm::new_in(t, &arena),
 
                 (t1, t2) => {
-                    let t1 = t1.simplify();
-                    let t2 = t2.simplify();
-                    Sum(Box::new(t1), Box::new(t2))
+                    let t1 = t1.simplify_in(&arena);
+                    let t2 = t2.simplify_in(&arena);
+
+                    ArenaTerm::new_in(Sum(t1, t2), &arena)
                 }
             },
 
             Scale { coefficient, term } => match *term {
-                Constant(c) => Constant(coefficient * c),
+                Constant(c) => ArenaTerm::new_in(Constant(coefficient * c), &arena),
 
                 Scale {
                     coefficient: coefficient2,
                     term: term2,
-                } => Scale { coefficient: coefficient * coefficient2, term: term2 }.simplify(),
+                } => Scale { coefficient: coefficient * coefficient2, term: term2 }.simplify_in(&arena),
 
                 /* distributivity */
                 Sum(t1, t2) => Sum(
-                    Box::new(
-                        Scale { coefficient, term: Box::new(t1.simplify()) }.simplify(),
-                    ),
-                    Box::new(
-                        Scale { coefficient, term: Box::new(t2.simplify()) }.simplify(),
-                    ),
-                ).simplify(),
+                    Scale { coefficient: coefficient, term: t1.simplify_in(&arena) }.simplify_in(&arena),
+                    Scale { coefficient: coefficient, term: t2.simplify_in(&arena) }.simplify_in(&arena),
+                ).simplify_in(&arena),
 
                 term if matches!(
                     term,
                     Var(_) | Sin(_) | Cos(_) | Power { .. } | Exponential(_, _) | Derivative { .. }
-                ) => Scale { coefficient, term: Box::new(term) },
+                ) => ArenaTerm::new_in(Scale { coefficient: coefficient, term: ArenaTerm::new_in(term, &arena) }, &arena),
 
-                _ => Scale { coefficient, term: Box::new(term.simplify()) },
+                _ => ArenaTerm::new_in(Scale { coefficient: coefficient, term: term.simplify_in(&arena) }, &arena),
             },
 
             Product(t1, t2) => match (*t1, *t2) {
-                (Constant(c1), Constant(c2)) => Constant(c1 * c2),
+                (Constant(c1), Constant(c2)) => ArenaTerm::new_in(Constant(c1 * c2), &arena),
+
+                (_, Constant(0.0)) => ArenaTerm::new_in(Constant(0.0), &arena),
+                (Constant(0.0), _) => ArenaTerm::new_in(Constant(0.0), &arena),
+
+                (t, Constant(1.0)) => ArenaTerm::new_in(t, &arena),
+                (Constant(1.0), t) => ArenaTerm::new_in(t, &arena),
 
                 (t1, t2) => {
-                    let t1 = t1.simplify();
-                    let t2 = t2.simplify();
-                    Product(Box::new(t1), Box::new(t2))
+                    let t1 = t1.simplify_in(&arena);
+                    let t2 = t2.simplify_in(&arena);
+                    ArenaTerm::new_in(Product(t1, t2), &arena)
                 }
             },
 
             Power { base, exponent } => match (*base, *exponent) {
-                (Constant(c1), Constant(c2)) => Constant(c1.powf(c2)),
+                (Constant(c1), Constant(c2)) => ArenaTerm::new_in(Constant(c1.powf(c2)), &arena),
+                (Constant(c), exponent) => ArenaTerm::new_in(Exponential(c, ArenaTerm::new_in(exponent, &arena)), &arena),
 
                 (base, exponent) => {
-                    let base = base.simplify();
-                    let exponent = exponent.simplify();
-                    Power {
-                        base: Box::new(base),
-                        exponent: Box::new(exponent),
-                    }
+                    let base = base.simplify_in(&arena);
+                    let exponent = exponent.simplify_in(&arena);
+
+                    ArenaTerm::new_in(Power {
+                        base: base,
+                        exponent: exponent,
+                    }, &arena)
                 }
             },
 
             Exponential(base, term) => match *term {
-                Constant(c) => Constant(base.powf(c)),
+                Constant(c) => ArenaTerm::new_in(Constant(base.powf(c)), &arena),
                 _ => {
-                    let simplified_term = term.simplify();
-                    Exponential(base, Box::new(simplified_term))
+                    let term = term.simplify_in(&arena);
+                    ArenaTerm::new_in(Exponential(base, term), &arena)
                 }
             },
 
             Sin(term) => match *term {
-                Constant(c) => Constant(c.sin()),
-                term => Sin(Box::new(term.simplify())),
+                Constant(c) => ArenaTerm::new_in(Constant(c.sin()), &arena),
+                term => ArenaTerm::new_in(Sin(term.simplify_in(&arena)), &arena),
             },
 
             Cos(term) => match *term {
-                Constant(c) => Constant(c.cos()),
-                _ => Cos(Box::new(term.simplify())),
+                Constant(c) => ArenaTerm::new_in(Constant(c.cos()), &arena),
+                _ => ArenaTerm::new_in(Cos(term.simplify_in(&arena)), &arena),
             },
 
             Derivative { order, wrt, term } => {
-                match term.simplify() {
+                match *term.simplify_in(&arena) {
                     Constant(c) => match order {
-                        0 => Constant(c),
-                        _ => Constant(0.0),
+                        0 => ArenaTerm::new_in(Constant(c), &arena),
+                        _ => ArenaTerm::new_in(Constant(0.0), &arena),
                     },
 
                     Var(_) => match (wrt, order) {
-                        (term, 0) => (*term),
-                        (_, 1) => Constant(1.0),
-                        (_, _) => Constant(0.0),
+                        (term, 0) => term,
+                        (_, 1) => ArenaTerm::new_in(Constant(1.0), &arena),
+                        (_, _) => ArenaTerm::new_in(Constant(0.0), &arena),
                     },
 
-                    term => Derivative {
-                        order,
+                    term => ArenaTerm::new_in(Derivative {
+                        order: order,
                         wrt,
-                        term: Box::new(term),
-                    },
+                        term: ArenaTerm::new_in(term, &arena),
+                    }, &arena),
                 }
             }
         }
     }
 
-    pub fn debug_simplify(self) -> Self {
-        fn recursive_simplify(__self: Term, depth: usize) -> Term {
+    pub fn debug_simplify_in(self, arena: &'arena Bump) -> Self {
+        fn recursive_simplify<'arena>(__self: Term<'arena>, depth: usize, arena: &'arena Bump) -> Term<'arena> {
             use Term::*;
 
             println!("{}<simplifying {}> {{", "   ".repeat(depth), __self);
@@ -120,9 +131,9 @@ impl Term {
                     (Constant(c1), Constant(c2)) => Constant(c1 + c2),
 
                     (t1, t2) => {
-                        let t1 = recursive_simplify(t1, depth + 1);
-                        let t2 = recursive_simplify(t2, depth + 1);
-                        Sum(Box::new(t1), Box::new(t2))
+                        let t1 = recursive_simplify(t1, depth + 1, &arena);
+                        let t2 = recursive_simplify(t2, depth + 1, &arena);
+                        Sum(ArenaTerm::new_in(t1, &arena), ArenaTerm::new_in(t2, &arena))
                     }
                 },
 
@@ -131,52 +142,58 @@ impl Term {
                     Scale {
                         coefficient: coefficient2,
                         term: term2,
-                    } => recursive_simplify(Scale { coefficient: coefficient * coefficient2, term: term2 }, depth + 1),
+                    } => recursive_simplify(Scale { coefficient: coefficient * coefficient2, term: term2 }, depth + 1, &arena),
 
                     /* distributivity */
                     Sum(t1, t2) => {
-                        let t1_simplified = recursive_simplify(*t1, depth + 1);
-                        let t2_simplified = recursive_simplify(*t2, depth + 1);
+                        let t1 = recursive_simplify(*t1, depth + 1, &arena);
+                        let t2 = recursive_simplify(*t2, depth + 1, &arena);
 
-                        let s1_simplified = Box::new(recursive_simplify(Scale {
+                        let s1 = ArenaTerm::new_in(recursive_simplify(Scale {
                             coefficient,
-                            term: Box::new(t1_simplified),
-                        }, depth + 1));
+                            term: ArenaTerm::new_in(t1, &arena),
+                        }, depth + 1, &arena), &arena);
 
-                        let s2_simplified = Box::new(recursive_simplify(Scale {
+                        let s2 = ArenaTerm::new_in(recursive_simplify(Scale {
                             coefficient,
-                            term: Box::new(t2_simplified),
-                        }, depth + 1));
+                            term: ArenaTerm::new_in(t2, &arena),
+                        }, depth + 1, &arena), &arena);
 
-                        recursive_simplify(Sum(s1_simplified, s2_simplified), depth + 1)
+                        recursive_simplify(Sum(s1, s2), depth + 1, &arena)
                     }
 
                     term if matches!(
                         term,
                         Var(_) | Sin(_) | Cos(_) | Power { .. } | Exponential(_, _) | Derivative { .. }
-                    ) => Scale { coefficient, term: Box::new(term) },
+                    ) => Scale { coefficient, term: ArenaTerm::new_in(term, &arena) },
 
-                    _ => Scale { coefficient, term: Box::new(recursive_simplify(*term, depth + 1)) },
+                    _ => Scale {
+                        coefficient,
+                        term: ArenaTerm::new_in(
+                            recursive_simplify(*term, depth + 1, &arena),
+                            &arena
+                        )
+                    },
                 },
 
                 Product(t1, t2) => match (*t1, *t2) {
                     (Constant(c1), Constant(c2)) => Constant(c1 * c2),
 
                     (t1, t2) => {
-                        let t1 = recursive_simplify(t1, depth + 1);
-                        let t2 = recursive_simplify(t2, depth + 1);
-                        Product(Box::new(t1), Box::new(t2))
+                        let t1 = recursive_simplify(t1, depth + 1, &arena);
+                        let t2 = recursive_simplify(t2, depth + 1, &arena);
+                        Product(ArenaTerm::new_in(t1, &arena), ArenaTerm::new_in(t2, &arena))
                     }
                 },
 
                 Power { base, exponent } => match (*base, *exponent) {
                     (Constant(c1), Constant(c2)) => Constant(c1.powf(c2)),
                     (base, exponent) => {
-                        let base = recursive_simplify(base, depth + 1);
-                        let exponent = recursive_simplify(exponent, depth + 1);
+                        let base = recursive_simplify(base, depth + 1, &arena);
+                        let exponent = recursive_simplify(exponent, depth + 1, &arena);
                         Power {
-                            base: Box::new(base),
-                            exponent: Box::new(exponent),
+                            base: ArenaTerm::new_in(base, &arena),
+                            exponent: ArenaTerm::new_in(exponent, &arena),
                         }
                     }
                 },
@@ -184,30 +201,30 @@ impl Term {
                 Exponential(base, term) => match *term {
                     Constant(c) => Constant(base.powf(c)),
                     _ => {
-                        let simplified_term = recursive_simplify(*term, depth + 1);
-                        Exponential(base, Box::new(simplified_term))
+                        let term = recursive_simplify(*term, depth + 1, &arena);
+                        Exponential(base, ArenaTerm::new_in(term, &arena))
                     }
                 },
 
                 Sin(term) => match *term {
                     Constant(c) => Constant(c.sin()),
-                    term => Sin(Box::new(recursive_simplify(term, depth + 1))),
+                    term => Sin(ArenaTerm::new_in(recursive_simplify(term, depth + 1, &arena), &arena)),
                 },
 
                 Cos(term) => match *term {
                     Constant(c) => Constant(c.cos()),
-                    _ => Cos(Box::new(recursive_simplify(*term, depth + 1))),
+                    _ => Cos(ArenaTerm::new_in(recursive_simplify(*term, depth + 1, &arena), &arena)),
                 },
 
                 Derivative { order, wrt, term } => {
-                    match recursive_simplify(*term, depth + 1) {
+                    match recursive_simplify(*term, depth + 1, &arena) {
                         Constant(c) => match order {
                             0 => Constant(c),
                             _ => Constant(0.0),
                         },
 
                         Var(_) => match (wrt, order) {
-                            (term, 0) => (*term),
+                            (term, 0) => *term,
                             (_, 1) => Constant(1.0),
                             (_, _) => Constant(0.0),
                         },
@@ -215,7 +232,7 @@ impl Term {
                         term => Derivative {
                             order,
                             wrt,
-                            term: Box::new(term),
+                            term: ArenaTerm::new_in(term, &arena),
                         },
                     }
                 }
@@ -225,6 +242,6 @@ impl Term {
             simplified
         }
 
-        recursive_simplify(self, 0)
+        recursive_simplify(self, 0, arena)
     }
 }
