@@ -3,14 +3,14 @@ CFLAGS=-Wall -Wextra -g
 
 .PHONY: clean run test
 
-main: main.c *.h *.c
-	@$(CC) $(CFLAGS) -o main main.c
+main: src/main.c src/*.h src/*.c
+	@$(CC) $(CFLAGS) -o main src/main.c
 
 run: main
 	@./main
 
-test: tests.c *.h *.c
-	@$(CC) $(CFLAGS) -o tests tests.c
+test: src/tests.c src/*.h src/*.c
+	@$(CC) $(CFLAGS) -o tests src/tests.c
 	@./tests
 	@rm -f ./tests
 

@@ -11,8 +11,8 @@ int main() {
   char *buffer = (char *)malloc(sizeof(char) * 1024);
   
   size_t written = serialize_expr(buffer, &e);
-  printf("%zu\n", written);
+  printf("serialized %zu bytes.\n", written);
 
-  printf("%s\n", buffer);
+  printf("expr: %s\n", buffer);
   free(buffer);
 }
