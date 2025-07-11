@@ -20,14 +20,14 @@ enum Term<'arena> {
     Var(char),
     Sum(ArenaTerm<'arena>, ArenaTerm<'arena>),
     
-    Scale { coefficient: f64, term: ArenaTerm<'arena>},
+    Scale { coefficient: f64, term: ArenaTerm<'arena> },
     Product(ArenaTerm<'arena>, ArenaTerm<'arena>),
     
-    Power { base: ArenaTerm<'arena>, exponent: ArenaTerm<'arena>},
+    Power { base: ArenaTerm<'arena>, exponent: ArenaTerm<'arena> },
     Exponential(f64, ArenaTerm<'arena>),
     
     Sin(ArenaTerm<'arena>),
     Cos(ArenaTerm<'arena>),
 
-    Derivative { order: usize, wrt: ArenaTerm<'arena>, term: ArenaTerm<'arena>},
+    Derivative { order: usize, wrt: ArenaTerm<'arena>, term: ArenaTerm<'arena> },
 }

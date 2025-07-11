@@ -1,12 +1,15 @@
+#[allow(unused)]
+
 #[cfg(test)]
 mod tests {
-    use crate::Term::*;
+    use crate::{Term, Term::*};
     use crate::ArenaTerm;
     use bumpalo::Bump;
+    use std::mem;
 
     #[test]
     fn it_works() {
-        let arena = Bump::new();
+        let arena = Bump::with_capacity(64 * mem::size_of::<Term>());
 
         let fterm = Scale {
             coefficient: 5.0,
@@ -121,6 +124,10 @@ mod tests {
             deriv_product.clone(),
             deriv_product.differentiate_in(Var('x'), &arena)
         );
+
+        println!("\n==============================");
+        println!("  * size of term = {} bytes", mem::size_of::<Term>());
+        println!("==============================");
 
         /*println!("{} ~> {}",
             deriv_sin.clone(),
