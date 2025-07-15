@@ -1,5 +1,5 @@
 CC=clang
-CFLAGS=-Wall -Wextra -g
+CFLAGS=-Wall -Wextra -g -lm #-fsanitize=address
 
 .PHONY: clean run test
 

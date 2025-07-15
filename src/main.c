@@ -1,18 +1,24 @@
 #include <stdio.h>
 #include <stdint.h>
+#include "allocator.h"
 #include "expressions.h"
 
 int main() {
-  [[gnu::unused]] expr_t e = Quotient(
-    &Sum(&Var('p'), &Product(&Var('q'), &Const(12))),
-    &Inverse(&Power(&Const(120), &Const(444)))
+  expr_t e = Quotient(
+    &Sum(&Var('p'), &Product(&Var('q'), &Sum(&Const(6), &Sum(&Sum(&Const(5), &Product(&Const(3), &Inverse(&Const(2)))), &Const(5))))),
+    &Inverse(&Inverse(&Inverse(&Const(8))))
   );
 
-  char *buffer = (char *)malloc(sizeof(char) * 1024);
-  
-  size_t written = serialize_expr(buffer, &e);
-  printf("serialized %zu bytes.\n", written);
+  char *buffer GPA_DEALLOC = (char*)gpa_allocator.alloc(sizeof(char) * serialized_expr_size(&e));
 
-  printf("expr: %s\n", buffer);
-  free(buffer);
+  usize written = serialize_expr(buffer, &e);
+  
+  printf("expr: %s\n\n", buffer);
+
+  simplify(&e);
+
+  memset(buffer, 0, written);
+  serialize_expr(buffer, &e);
+
+  printf("simplification: %s\n", buffer);
 }
